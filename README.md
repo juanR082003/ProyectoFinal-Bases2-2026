@@ -49,3 +49,50 @@ En SQL Developer: abrir cada archivo y usar **Ejecutar script (F5)**, no F9, par
 
 Si se vuelven a ejecutar 01 y 02, hay que repetir 04 a 07 (borrar las tablas borra sus disparadores
 y deja inválida la vista materializada).
+
+## Entrega 3 · Transacciones, índices y seguridad
+
+| Orden | Script | Conectado como | Qué hace |
+|---|---|---|---|
+| 9 | `09_transacciones.sql` | TURISMOUQ | `PKG_RESERVAS_TX`: reserva + pago atómicos con `SAVEPOINT`, rollback parcial, bloqueo de habitación; disparador de reactivación; pruebas T9 |
+| 10 | `10_concurrencia.sql` | TURISMOUQ | Antes y después de `SELECT ... FOR UPDATE`, reproducido con transacciones autónomas (pruebas T10) |
+| 11 | `11_indices.sql` | TURISMOUQ | 3 consultas lentas, plan y tiempo antes/después, índices compuestos y basado en función, y el caso donde el índice no ayuda |
+| 12 | `12_seguridad_roles_usuarios.sql` | **SYSTEM** @ XEPDB1 | Perfil `PERFIL_TURISMOUQ`, 4 roles y 5 usuarios de ejemplo |
+| 13 | `13_seguridad_vistas_privilegios.sql` | TURISMOUQ | `PKG_SEGURIDAD`, vistas `V_REC_*` / `V_ADM_*` / `V_GER_*`, paquetes de acceso y `GRANT` por rol |
+| 14 | `14_pruebas_seguridad.sql` | cualquiera | Se conecta por turnos como cada usuario y prueba qué puede y qué no (OK / FALLA) |
+
+**Experimento de concurrencia con dos sesiones reales** (de aquí salen las capturas del documento):
+abrir dos ventanas como TURISMOUQ y una como SYSTEM y seguir las pausas de
+`concurrencia/sesion_A.sql` (ventana A), `concurrencia/sesion_B.sql` (ventana B) y
+`concurrencia/monitor_system.sql` (ventana SYSTEM, muestra el bloqueo en `V$SESSION` y `V$LOCK`).
+
+Usuarios de ejemplo (clave entre paréntesis): `RECEP_HOTEL1` y `RECEP_SALENTO` (`Recepcion_2026`),
+`ENC_HOTEL` (`Encargado_2026`), `GERENTE_GENERAL` (`Gerencia_2026`), `AUDITOR_INTERNO` (`Auditoria_2026`).
+
+En SQL Developer el mismo experimento se hace con dos hojas **no compartidas** de TURISMOUQ
+(Ctrl+Shift+N) y una de SYSTEM, ejecutando con `@` y F5 los pasos de `concurrencia/sqldeveloper/`
+en este orden: A0, A1, B1, A2, B2, A4 · A3, B3 (queda esperando), `monitor_system.sql` en SYSTEM, A2 ·
+A6, B4, A7.
+
+El documento `docs/Entrega3_TurismoUQ.docx` incluye las capturas reales de la ejecución
+(carpeta `docs/capturas/`), hechas en Oracle Database 26ai Free (Docker, servicio `FREEPDB1`)
+con SQL Developer 26.2 en macOS.
+
+Notas:
+
+- Si se repite el script 12 hay que repetir el 13 (al borrar un rol se pierden sus privilegios).
+- Si se vuelven a ejecutar 01 y 02, hay que repetir 04 a 07 y 09 a 13.
+- Las pruebas reservan en enero de 2027: deben ejecutarse antes del 18-01-2027.
+- `14_pruebas_seguridad.sql` asume `localhost:1521/FREEPDB1` (Oracle Free 23ai/26ai); en Oracle XE 21c cambiar su línea `DEFINE conexion` a `XEPDB1`. Como cambia de usuario con `CONNECT`, conviene ejecutarlo en SQL*Plus o SQLcl: SQL Developer no muestra la salida después de un `CONNECT` dentro de un script.
+
+## Orden completo desde una base limpia
+
+```
+SYSTEM     00
+TURISMOUQ  01  02  03
+SYSTEM     04
+TURISMOUQ  05  06  07  08
+TURISMOUQ  09  10  11
+SYSTEM     12
+TURISMOUQ  13  14
+```
